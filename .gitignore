@@ -14,8 +14,14 @@ crash.*.log
 # Exports de base de données (contiennent des données personnelles)
 backup/
 
+# Sorties brutes des tests de charge (résultats résumés dans les README)
+loadtest-results/
+
 # Clés et identifiants
 *.pem
 *.key
 id_*
 .aws/
+
+# Dépendances Node.js installées localement
+node_modules/

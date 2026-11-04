@@ -1,0 +1,297 @@
+# Chaîne CI/CD de l'application "dossiers des étudiants" (phase 5).
+#
+#   1. Build                  -> dépendances, vérification syntaxique, image Docker
+#   2. Tests de qualité       -> 2a. analyse statique (Dockerfile, scripts, Terraform, dépendances)
+#                                2b. tests fonctionnels de l'image (application + MySQL)
+#   3. Packaging et push      -> image publiée dans Amazon ECR, tag = SHA du commit
+#   4. Test de charge         -> image publiée, testée sous charge avec seuils bloquants
+#   5. Déploiement production -> promotion en "latest" + remplacement progressif des instances + test
+#
+# Pull request : étapes 1 et 2 uniquement (aucun accès AWS).
+# Push sur main : chaîne complète. Documentation : phase5/README.md
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "phase4/Dockerfile"
+      - "phase4/Dockerfile.dockerignore"
+      - "phase4/docker-compose.yml"
+      - "phase4/local/**"
+      - "phase4/scripts/test-app.sh"
+      - "phase5/**"
+      - ".github/workflows/ci-cd.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Déployer en production après les tests"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: universite-exemple-app
+  ASG_NAME: universite-exemple-p4-asg
+  ALB_NAME: universite-exemple-p4-alb
+  LOCAL_IMAGE: universite-exemple-app:local # nom attendu par phase4/docker-compose.yml
+  COMPOSE_FILE: phase4/docker-compose.yml
+
+# Un seul déploiement à la fois ; une PR mise à jour annule son exécution précédente
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  build:
+    name: 1. Build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Installation des dépendances (versions verrouillées)
+        working-directory: app
+        run: npm ci --omit=dev --no-audit --no-fund
+
+      - name: Vérification syntaxique du code JavaScript
+        run: find app -name '*.js' -not -path '*/node_modules/*' -not -path 'app/public/*' -print -exec node --check {} \;
+
+      - name: Construction de l'image Docker
+        run: docker build --provenance=false --sbom=false -f phase4/Dockerfile -t "$LOCAL_IMAGE" app
+
+      - name: Export de l'image pour les étapes suivantes
+        run: |
+          docker image ls "$LOCAL_IMAGE"
+          docker save "$LOCAL_IMAGE" | gzip > image.tar.gz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: image
+          path: image.tar.gz
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  quality-static:
+    name: 2a. Qualité - analyse statique
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dockerfile (hadolint)
+        uses: hadolint/hadolint-action@v3.5.0
+        with:
+          dockerfile: phase4/Dockerfile
+          failure-threshold: warning
+
+      - name: Scripts shell (shellcheck)
+        # Les scripts fournis par le sujet (userdata.sh) sont exclus : ils sont utilisés tels quels.
+        run: |
+          shellcheck --version | head -2
+          shellcheck --severity=warning \
+            phase2/scripts/migrate-data.sh phase3/scripts/*.sh phase4/scripts/*.sh phase5/scripts/*.sh
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform - formatage
+        run: terraform fmt -check -recursive -diff
+
+      - name: Terraform - validation de chaque configuration
+        run: |
+          for dir in phase1 phase2 phase3 phase4 phase4/registry; do
+            echo "::group::$dir"
+            terraform -chdir="$dir" init -backend=false -input=false -no-color >/dev/null
+            terraform -chdir="$dir" validate -no-color
+            echo "::endgroup::"
+          done
+
+      - name: Audit des dépendances npm (informatif)
+        # Le code fourni impose d'anciennes versions (mysql2 2.2.5, express 4.17) que le sujet
+        # interdit de modifier : l'audit est publié dans le résumé mais ne bloque pas la chaîne.
+        working-directory: app
+        run: |
+          {
+            echo "### Audit npm (dépendances de production)"
+            echo '```'
+            npm audit --omit=dev --audit-level=critical 2>&1 | tail -n 25 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  quality-functional:
+    name: 2b. Qualité - tests fonctionnels
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+
+      - name: Chargement de l'image construite
+        run: gunzip -c image.tar.gz | docker load
+
+      - name: Démarrage de l'application et de MySQL
+        run: docker compose -f "$COMPOSE_FILE" up -d --no-build --wait --wait-timeout 180
+
+      - name: Tests fonctionnels (affichage, ajout, modification, suppression)
+        run: bash phase4/scripts/test-app.sh http://localhost:8080
+
+      - name: Conteneur sain et non root
+        run: |
+          test "$(docker inspect --format '{{.State.Health.Status}}' universite-exemple-local-app-1)" = healthy
+          test "$(docker exec universite-exemple-local-app-1 id -u)" != 0
+
+      - name: Journaux en cas d'échec
+        if: failure()
+        run: docker compose -f "$COMPOSE_FILE" logs
+
+  # ---------------------------------------------------------------------------
+  push:
+    name: 3. Packaging et push (ECR)
+    needs: [quality-static, quality-functional]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    outputs:
+      image: ${{ steps.push.outputs.image }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+
+      - name: Chargement de l'image testée
+        run: gunzip -c image.tar.gz | docker load
+
+      # Identifiants temporaires du lab AWS Academy (secrets du dépôt, à renouveler à chaque session)
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Publication (tag immuable = SHA du commit)
+        id: push
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:${GITHUB_SHA::7}"
+          docker tag "$LOCAL_IMAGE" "$IMAGE"
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "Image publiée : \`$IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  load-test:
+    name: 4. Test de charge
+    needs: push
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Récupération de l'image publiée dans ECR
+        env:
+          IMAGE: ${{ needs.push.outputs.image }}
+        run: |
+          docker pull "$IMAGE"
+          docker tag "$IMAGE" "$LOCAL_IMAGE"
+
+      - name: Démarrage de l'application
+        run: docker compose -f "$COMPOSE_FILE" up -d --no-build --wait --wait-timeout 180
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: phase5/load-test/package-lock.json
+
+      - name: Test de charge avec seuils (loadtest)
+        working-directory: phase5/load-test
+        env:
+          DURATION: "60"
+          RPS: "200"
+          CONCURRENCY: "50"
+          MAX_ERROR_RATE: "0.5"
+          MAX_P95_MS: "500"
+        run: |
+          npm ci --no-audit --no-fund
+          node load-test-ci.mjs http://localhost:8080/
+
+      - name: Application toujours fonctionnelle après la charge
+        run: bash phase4/scripts/test-app.sh http://localhost:8080
+
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: 5. Déploiement en production
+    needs: [push, load-test]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.deploy)
+    runs-on: ubuntu-24.04
+    environment:
+      name: production
+      url: ${{ steps.alb.outputs.url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Infrastructure de production présente ?
+        id: alb
+        run: |
+          if [ "$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$ASG_NAME" \
+                 --query 'length(AutoScalingGroups)' --output text)" != 1 ]; then
+            echo "::error::Groupe Auto Scaling $ASG_NAME introuvable : déployer phase4/ (terraform apply) avant de déployer."
+            exit 1
+          fi
+          DNS=$(aws elbv2 describe-load-balancers --names "$ALB_NAME" --query 'LoadBalancers[0].DNSName' --output text)
+          echo "url=http://$DNS" >> "$GITHUB_OUTPUT"
+
+      - name: Promotion de l'image testée en "latest"
+        run: bash phase5/scripts/promote-image.sh "$ECR_REPOSITORY" "${GITHUB_SHA::7}" latest
+
+      - name: Remplacement progressif des instances (sans interruption)
+        run: bash phase5/scripts/rolling-deploy.sh "$ASG_NAME"
+
+      - name: Test de la production
+        run: bash phase4/scripts/test-app.sh "${{ steps.alb.outputs.url }}"
+
+      - name: Résumé
+        run: |
+          {
+            echo "### Déploiement en production réussi"
+            echo "- Image : \`${{ needs.push.outputs.image }}\` (promue en \`latest\`)"
+            echo "- Application : ${{ steps.alb.outputs.url }}"
+          } >> "$GITHUB_STEP_SUMMARY"

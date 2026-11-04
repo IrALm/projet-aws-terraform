@@ -1,0 +1,45 @@
+# Test LOCAL de l'image, sans compte AWS : application + MySQL sur le poste.
+#   docker compose -f phase4/docker-compose.yml up --build -d
+#   -> http://localhost:8080
+#
+# Pourquoi network_mode "service:db" ?
+# Sans accès à Secrets Manager, le code fourni (app/config/config.js) se rabat sur des valeurs
+# par défaut figées dans le code : host "localhost", utilisateur "nodeapp", mot de passe
+# "student12", base "STUDENTS". Ces valeurs écrasent toute variable d'environnement.
+# Le conteneur de l'application partage donc la pile réseau du conteneur MySQL :
+# "localhost:3306" y désigne bien MySQL, sans modifier une ligne du code.
+# Ces identifiants ne servent qu'à ce test local ; en AWS, ils viennent de Secrets Manager.
+
+name: universite-exemple-local
+
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root-local-only
+      MYSQL_DATABASE: STUDENTS
+      MYSQL_USER: nodeapp
+      MYSQL_PASSWORD: student12
+    volumes:
+      - ./local/init-db.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    # Le port de l'application est publié ici, car l'application vit dans l'espace réseau de "db"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot-local-only"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build:
+      context: ../app
+      dockerfile: ../phase4/Dockerfile
+    image: universite-exemple-app:local
+    init: true # même comportement que sur EC2 (docker run --init)
+    network_mode: "service:db"
+    environment:
+      APP_PORT: "8080"
+    depends_on:
+      db:
+        condition: service_healthy

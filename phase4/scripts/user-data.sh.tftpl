@@ -1,0 +1,34 @@
+#!/bin/bash
+# Démarrage d'un serveur web en version conteneurisée (phase 4).
+# Remplace l'installation de Node.js + npm des phases 2 et 3 par l'exécution
+# de l'image publiée dans Amazon ECR. Template rendu par Terraform (templatefile).
+set -euxo pipefail
+export HOME=/root DEBIAN_FRONTEND=noninteractive
+
+# Docker, assistant d'authentification ECR (utilise le rôle IAM de l'instance, sans mot de passe)
+# et client MySQL (utilisé uniquement par le script de migration des données)
+apt-get update -y
+apt-get install -y docker.io amazon-ecr-credential-helper mysql-client
+systemctl enable --now docker
+
+mkdir -p /root/.docker
+echo '{ "credsStore": "ecr-login" }' > /root/.docker/config.json
+
+IMAGE="${image_uri}"
+
+# L'image peut être poussée quelques minutes après le lancement : on réessaie pendant 20 minutes
+for attempt in $(seq 1 60); do
+  docker pull "$IMAGE" && break
+  echo "Image $IMAGE indisponible (essai $attempt/60), nouvel essai dans 20 s"
+  sleep 20
+done
+
+# --restart always : Docker relance l'application si elle s'arrête (et au redémarrage de la VM).
+# Le port 80 de l'hôte (ouvert à l'ALB uniquement) est redirigé vers le port 8080 du conteneur,
+# où l'application tourne sans privilèges root.
+# --init : un mini-init (tini) devient le PID 1 et transmet les signaux à Node.js
+# (sinon Node.js, en PID 1, ignore SIGTERM et "docker stop" attend 10 s avant de le tuer).
+docker run -d --name app --restart always --init \
+  -p ${host_port}:8080 -e APP_PORT=8080 \
+  --log-opt max-size=10m --log-opt max-file=3 \
+  "$IMAGE"

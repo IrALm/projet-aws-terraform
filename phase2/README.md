@@ -22,6 +22,7 @@ Séparer l'application web et la base de données pour qu'elles fonctionnent ind
 | SG web | 80 depuis `0.0.0.0/0`, 22 depuis l'IP admin `/32` | Ports strictement nécessaires |
 | SG base | 3306 **uniquement depuis le SG web** (référence de SG, pas d'IP) | Seuls les serveurs web parlent à la base |
 | RDS MySQL 8.4 | `db.t3.micro`, mono-AZ, gp3 20 Go chiffré (autoscaling jusqu'à 50 Go), `publicly_accessible = false`, sauvegarde 1 jour | Service managé, coût minimal, mono-AZ autorisé par le sujet |
+| Groupe de paramètres RDS | `wait_timeout = 10`, `max_connections = 150` | L'application ne ferme jamais ses connexions : MySQL ferme lui-même celles qui sont inactives, et la limite laisse de la marge pour les rafales (voir « Difficultés ») |
 | Secrets Manager | secret `Mydbsecret` : `{user, password, host, db}` | Nom et format imposés par le code fourni (`app/config/config.js`) |
 | Mot de passe | généré par Terraform (`random_password`, 24 caractères) | Jamais saisi ni écrit par un humain |
 | EC2 web | `t3.micro` Ubuntu 24.04, **IMDSv2 obligatoire**, EBS chiffré, profil `LabInstanceProfile` | Plus de MySQL local : une micro suffit ; le profil IAM donne accès au secret sans clé |
@@ -99,7 +100,7 @@ Toutes les autres variables ont une valeur par défaut adaptée au lab (voir [va
 ```powershell
 terraform init
 terraform validate
-terraform plan        # 26 ressources à créer
+terraform plan        # 27 ressources à créer
 terraform apply       # répondre "yes" ; RDS prend 5 à 15 minutes
 ```
 
@@ -225,7 +226,7 @@ Déploiement réel dans le lab AWS Academy le 04/11/2026 :
 
 | Test | Commande / méthode | Résultat |
 |---|---|---|
-| `terraform apply` | 26 ressources | OK, en 8 min 30 (RDS : 8 min) |
+| `terraform apply` | 26 ressources (avant l'ajout du groupe de paramètres) | OK, en 8 min 30 (RDS : 8 min) |
 | RDS non publique | `describe-db-instances` → `PubliclyAccessible` | `False` |
 | Port 3306 depuis Internet | connexion TCP vers l'endpoint RDS depuis le poste | Refusée (timeout) |
 | Chiffrement RDS | `StorageEncrypted` | `True` |
@@ -237,6 +238,16 @@ Déploiement réel dans le lab AWS Academy le 04/11/2026 :
 | Modification | `POST /supplier-update` | OK (nom et ville modifiés) |
 | Suppression | `POST /supplier-remove/4` | OK |
 | Profil IAM | Console EC2 → onglet Sécurité | `LabRole` |
+
+**Nouveau test après l'ajout du groupe de paramètres RDS** (même jour, version finale du code) :
+
+| Test | Résultat |
+|---|---|
+| `terraform apply` | **27 ressources**, OK (RDS : 9 min) |
+| Migration lancée juste après l'apply | OK : le script attend que SSH réponde, puis importe 3 étudiants |
+| `bash ../phase4/scripts/test-app.sh <URL>` | 6 / 6 tests réussis |
+| Paramètres effectifs sur RDS | `wait_timeout = 10`, `max_connections = 150` |
+| 300 affichages de la liste en 75 s (contenu vérifié) | **300 / 300** ; 34 connexions ouvertes au plus fort, 1 seule 12 s plus tard |
 
 ## Choix techniques
 
@@ -262,7 +273,20 @@ Déploiement réel dans le lab AWS Academy le 04/11/2026 :
 3. **L'application ne crée pas sa table** : sans migration, la page des étudiants renvoie une erreur. D'où le mode `--init` du script de migration, qui crée le schéma quand aucune phase 1 n'est disponible.
 4. **Nom et région du secret codés en dur dans l'application** (`Mydbsecret`, `us-east-1`, code à ne pas modifier) : le nom n'est donc pas préfixé par le projet. Deux environnements ne peuvent pas coexister dans le même compte, ce qui est à prendre en compte en phase 3.
 5. **Suppression différée des secrets** : par défaut, un secret supprimé reste réservé 7 à 30 jours et bloque sa recréation. Corrigé avec `recovery_window_in_days = 0`.
-6. **Pas de région par défaut dans l'AWS CLI** : le fichier `credentials` du lab ne contient pas de région, et `aws rds describe-db-instances` sans `--region` échoue avec `NoRegion`. Toutes les commandes du README et du script passent donc `--region` explicitement.
+6. **Fuite de connexions dans le code fourni** (découverte en phase 3) : `app/models/supplier.model.js` ouvre une connexion MySQL à chaque requête sans jamais la fermer (ni `end()`, ni pool). RDS `db.t3.micro` n'accepte que **61 connexions**, et une connexion inactive reste ouverte 8 heures par défaut. Après environ 60 affichages de la liste, la base répond `Too many connections`, et l'application affiche sa page « There was an error »… **avec un code HTTP 200**, ce qui rend le problème invisible pour un simple contrôle du code de retour. Le code ne devant pas être modifié, la correction est faite dans l'infrastructure, avec un groupe de paramètres RDS :
+   - `wait_timeout = 10` : MySQL ferme lui-même les connexions inactives après 10 s ;
+   - `max_connections = 150` : plus de marge pour les rafales.
+
+   Capacité soutenue sur les pages qui lisent la base : environ `max_connections / wait_timeout` = 15 requêtes/s. Mesures en rafale, en vérifiant le **contenu** de chaque page :
+
+   | Réglage | Pages affichant réellement la liste |
+   |---|---|
+   | Par défaut (8 h, 61 connexions) | environ 60, puis uniquement des erreurs |
+   | `wait_timeout = 30`, 61 connexions | 97 / 150 |
+   | **`wait_timeout = 10`, 150 connexions** | **300 / 300** |
+
+   Le script `test-app.sh` (phase 4) vérifie désormais aussi l'absence de la page d'erreur.
+7. **Pas de région par défaut dans l'AWS CLI** : le fichier `credentials` du lab ne contient pas de région, et `aws rds describe-db-instances` sans `--region` échoue avec `NoRegion`. Toutes les commandes du README et du script passent donc `--region` explicitement.
 
 ## Limites et améliorations possibles
 

@@ -1,24 +1,63 @@
-# Module sécurité : un security group par couche (web, base de données).
+# Module sécurité : un security group par couche (équilibreur, web, base de données).
 # Principe du moindre privilège : chaque couche n'accepte que le port dont elle a besoin,
-# et la base n'accepte que le trafic provenant du security group web (pas d'IP).
+# et uniquement depuis la couche précédente (références de security groups, pas d'IP) :
+#   Internet -> [SG alb :80] -> [SG web :80] -> [SG db :3306]
+# Sans équilibreur (enable_alb = false, phase 2) : Internet -> [SG web :80] -> [SG db :3306]
 # Note : AWS refuse les accents et apostrophes dans les descriptions (ASCII uniquement).
+
+# ---------- Couche équilibreur de charge (phase 3) ----------
+resource "aws_security_group" "alb" {
+  count = var.enable_alb ? 1 : 0
+
+  name        = "${var.name}-alb-sg"
+  description = "ALB: HTTP public"
+  vpc_id      = var.vpc_id
+
+  tags = { Name = "${var.name}-alb-sg" }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_http" {
+  count = var.enable_alb ? 1 : 0
+
+  security_group_id = aws_security_group.alb[0].id
+  description       = "HTTP depuis Internet"
+  ip_protocol       = "tcp"
+  from_port         = 80
+  to_port           = 80
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+# L'ALB ne peut sortir que vers les serveurs web, sur le port de l'application
+resource "aws_vpc_security_group_egress_rule" "alb_to_web" {
+  count = var.enable_alb ? 1 : 0
+
+  security_group_id            = aws_security_group.alb[0].id
+  description                  = "Vers les serveurs web"
+  ip_protocol                  = "tcp"
+  from_port                    = var.app_port
+  to_port                      = var.app_port
+  referenced_security_group_id = aws_security_group.web.id
+}
 
 # ---------- Couche web ----------
 resource "aws_security_group" "web" {
   name        = "${var.name}-web-sg"
-  description = "Serveur web: HTTP public, SSH admin"
+  description = var.enable_alb ? "Serveur web: HTTP depuis ALB, SSH admin" : "Serveur web: HTTP public, SSH admin"
   vpc_id      = var.vpc_id
 
   tags = { Name = "${var.name}-web-sg" }
 }
 
+# Avec ALB : HTTP accepté uniquement depuis l'ALB (les instances ne sont pas
+# joignables directement en HTTP depuis Internet). Sans ALB : HTTP public.
 resource "aws_vpc_security_group_ingress_rule" "web_http" {
-  security_group_id = aws_security_group.web.id
-  description       = "HTTP depuis Internet"
-  ip_protocol       = "tcp"
-  from_port         = var.app_port
-  to_port           = var.app_port
-  cidr_ipv4         = "0.0.0.0/0"
+  security_group_id            = aws_security_group.web.id
+  description                  = var.enable_alb ? "HTTP depuis ALB uniquement" : "HTTP depuis Internet"
+  ip_protocol                  = "tcp"
+  from_port                    = var.app_port
+  to_port                      = var.app_port
+  cidr_ipv4                    = var.enable_alb ? null : "0.0.0.0/0"
+  referenced_security_group_id = var.enable_alb ? aws_security_group.alb[0].id : null
 }
 
 resource "aws_vpc_security_group_ingress_rule" "web_ssh" {

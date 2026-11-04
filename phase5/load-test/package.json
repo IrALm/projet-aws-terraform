@@ -1,0 +1,13 @@
+{
+  "name": "universite-exemple-load-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Test de charge avec seuils pour la chaîne CI/CD (loadtest, Script-2 du sujet)",
+  "type": "module",
+  "scripts": {
+    "test:load": "node load-test-ci.mjs"
+  },
+  "dependencies": {
+    "loadtest": "8.2.1"
+  }
+}

@@ -14,6 +14,12 @@ variable "app_port" {
   default     = 80
 }
 
+variable "enable_alb" {
+  description = "Crée le SG de l'équilibreur et restreint le HTTP des serveurs web à l'ALB"
+  type        = bool
+  default     = false
+}
+
 variable "ssh_allowed_cidr" {
   description = "IP autorisée en SSH, au format x.x.x.x/32"
   type        = string

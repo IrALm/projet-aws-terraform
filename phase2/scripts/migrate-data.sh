@@ -53,6 +53,13 @@ echo "Base cible : $DB_NAME sur $DB_HOST (utilisateur $DB_USER)"
 
 # ---------- 2. Serveur web prêt ? ----------
 step "Attente de la fin de l'installation du serveur web ($APP_IP)"
+# Juste après l'apply, SSH n'est pas encore démarré sur l'instance : on réessaie.
+for i in $(seq 1 20); do
+  ssh "${SSH_OPTS[@]}" "ubuntu@$APP_IP" true 2>/dev/null && break
+  [[ $i -eq 20 ]] && fail "SSH injoignable sur $APP_IP (votre IP a-t-elle changé ? voir terraform.tfvars)"
+  echo "  SSH pas encore disponible, nouvelle tentative dans 15 s..."
+  sleep 15
+done
 ssh "${SSH_OPTS[@]}" "ubuntu@$APP_IP" "cloud-init status --wait >/dev/null; command -v mysql >/dev/null" \
   || fail "Le serveur web n'est pas prêt (mysql-client absent). Voir /var/log/cloud-init-output.log"
 echo "Serveur web prêt."

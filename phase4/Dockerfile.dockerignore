@@ -1,0 +1,7 @@
+# Fichiers exclus du contexte de construction (dossier app/).
+# Docker utilise ce fichier car il porte le nom du Dockerfile suivi de .dockerignore.
+node_modules
+npm-debug.log
+.git
+.env
+*.md

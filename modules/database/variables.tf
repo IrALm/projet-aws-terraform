@@ -49,6 +49,18 @@ variable "db_username" {
   default     = "admin"
 }
 
+variable "wait_timeout" {
+  description = "Secondes avant que MySQL ferme une connexion inactive (l'application ne ferme jamais les siennes)"
+  type        = number
+  default     = 10
+}
+
+variable "max_connections" {
+  description = "Nombre maximal de connexions simultanées (61 par défaut sur db.t3.micro)"
+  type        = number
+  default     = 150
+}
+
 variable "multi_az" {
   description = "Active la réplique de secours dans une autre zone"
   type        = bool

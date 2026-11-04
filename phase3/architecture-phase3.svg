@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 800" width="1140" height="800" font-family="Segoe UI, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+  </defs>
+  <rect width="1140" height="800" fill="#ffffff"/>
+  <text x="570" y="32" text-anchor="middle" font-size="20" font-weight="600" fill="#232f3e">Phase 3 : haute disponibilité et mise à l'échelle automatique</text>
+
+  <!-- Acteurs -->
+  <rect x="20" y="120" width="150" height="60" rx="8" fill="#f2f2f2" stroke="#666"/>
+  <text x="95" y="146" text-anchor="middle" fill="#222" font-weight="600">Utilisateurs</text>
+  <text x="95" y="166" text-anchor="middle" fill="#444" font-size="12">des milliers, HTTP :80</text>
+
+  <rect x="20" y="420" width="150" height="104" rx="8" fill="#f2f2f2" stroke="#666"/>
+  <text x="95" y="444" text-anchor="middle" fill="#222" font-weight="600">Poste admin</text>
+  <text x="95" y="463" text-anchor="middle" fill="#444" font-size="12">Terraform, AWS CLI</text>
+  <text x="95" y="480" text-anchor="middle" fill="#444" font-size="12">load-test.sh (loadtest)</text>
+  <text x="95" y="497" text-anchor="middle" fill="#444" font-size="12">migrate-data.sh</text>
+  <text x="95" y="514" text-anchor="middle" fill="#444" font-size="12">SSH :22 (IP/32)</text>
+
+  <!-- Région -->
+  <rect x="195" y="50" width="930" height="730" rx="6" fill="none" stroke="#232f3e" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="210" y="72" fill="#232f3e" font-weight="600">AWS Cloud : région us-east-1</text>
+
+  <!-- Services régionaux -->
+  <rect x="560" y="85" width="170" height="64" rx="8" fill="#fde8e8" stroke="#dd344c" stroke-width="1.5"/>
+  <text x="645" y="110" text-anchor="middle" fill="#a3172b" font-weight="600">IAM</text>
+  <text x="645" y="130" text-anchor="middle" fill="#a3172b" font-size="12">LabInstanceProfile</text>
+  <rect x="745" y="85" width="170" height="64" rx="8" fill="#fde8e8" stroke="#dd344c" stroke-width="1.5"/>
+  <text x="830" y="110" text-anchor="middle" fill="#a3172b" font-weight="600">Secrets Manager</text>
+  <text x="830" y="130" text-anchor="middle" fill="#a3172b" font-size="12">Mydbsecret</text>
+  <rect x="930" y="85" width="180" height="64" rx="8" fill="#fce4f2" stroke="#e7157b" stroke-width="1.5"/>
+  <text x="1020" y="108" text-anchor="middle" fill="#9c0f53" font-weight="600">CloudWatch</text>
+  <text x="1020" y="126" text-anchor="middle" fill="#9c0f53" font-size="12">alarmes CPU (cible 50 %)</text>
+  <text x="1020" y="141" text-anchor="middle" fill="#9c0f53" font-size="12">tableau de bord</text>
+
+  <!-- IGW -->
+  <rect x="220" y="185" width="100" height="62" rx="8" fill="#8c4fff" stroke="#5a2db3"/>
+  <text x="270" y="212" text-anchor="middle" fill="#fff" font-weight="600">Internet</text>
+  <text x="270" y="231" text-anchor="middle" fill="#fff" font-weight="600">Gateway</text>
+
+  <!-- VPC -->
+  <rect x="270" y="165" width="840" height="600" rx="6" fill="#f3ecff" fill-opacity="0.3" stroke="#8c4fff" stroke-width="2"/>
+  <text x="340" y="187" fill="#5a2db3" font-weight="600">VPC universite-exemple-p3-vpc : 10.0.0.0/16</text>
+
+  <!-- AZ -->
+  <rect x="340" y="198" width="370" height="555" rx="6" fill="none" stroke="#147eba" stroke-dasharray="4 4"/>
+  <text x="355" y="218" fill="#147eba" font-weight="600">Zone us-east-1a</text>
+  <rect x="725" y="198" width="370" height="555" rx="6" fill="none" stroke="#147eba" stroke-dasharray="4 4"/>
+  <text x="740" y="218" fill="#147eba" font-weight="600">Zone us-east-1b</text>
+
+  <!-- Subnets publics -->
+  <rect x="355" y="228" width="340" height="320" rx="6" fill="#e9f5e1" stroke="#3f8624" stroke-width="1.5"/>
+  <text x="368" y="247" fill="#2d6a1a" font-weight="600">Public : 10.0.1.0/24</text>
+  <rect x="740" y="228" width="340" height="320" rx="6" fill="#e9f5e1" stroke="#3f8624" stroke-width="1.5"/>
+  <text x="753" y="247" fill="#2d6a1a" font-weight="600">Public : 10.0.2.0/24</text>
+
+  <!-- ALB couvrant les deux zones -->
+  <rect x="380" y="262" width="675" height="62" rx="8" fill="#8c4fff" stroke="#5a2db3" stroke-width="1.5"/>
+  <text x="717" y="288" text-anchor="middle" fill="#fff" font-weight="600">Application Load Balancer (public, 2 zones)</text>
+  <text x="717" y="308" text-anchor="middle" fill="#fff" font-size="12">SG alb : 80 depuis 0.0.0.0/0 · health check GET / toutes les 15 s · listener HTTP :80</text>
+
+  <!-- ASG -->
+  <rect x="370" y="345" width="695" height="190" rx="8" fill="none" stroke="#ed7100" stroke-width="2" stroke-dasharray="8 4"/>
+  <text x="385" y="365" fill="#9a4a00" font-weight="600">Groupe Auto Scaling : min 2 · désiré 2 · max 4 · suivi de cible CPU 50 %</text>
+  <text x="385" y="383" fill="#d13212" font-size="12" font-weight="600">SG web : 80 depuis le SG alb uniquement · 22 depuis IP/32</text>
+
+  <rect x="395" y="395" width="135" height="80" rx="8" fill="#fff4e5" stroke="#ed7100" stroke-width="2"/>
+  <text x="462" y="420" text-anchor="middle" fill="#9a4a00" font-weight="600">EC2 web</text>
+  <text x="462" y="438" text-anchor="middle" fill="#9a4a00" font-size="12">t3.micro</text>
+  <text x="462" y="455" text-anchor="middle" fill="#9a4a00" font-size="12">Node.js :80</text>
+  <rect x="545" y="395" width="135" height="80" rx="8" fill="#fff4e5" stroke="#ed7100" stroke-dasharray="5 3"/>
+  <text x="612" y="425" text-anchor="middle" fill="#9a4a00" font-size="12" font-style="italic">EC2 web</text>
+  <text x="612" y="443" text-anchor="middle" fill="#9a4a00" font-size="12" font-style="italic">ajoutée sous charge</text>
+
+  <rect x="780" y="395" width="135" height="80" rx="8" fill="#fff4e5" stroke="#ed7100" stroke-width="2"/>
+  <text x="847" y="420" text-anchor="middle" fill="#9a4a00" font-weight="600">EC2 web</text>
+  <text x="847" y="438" text-anchor="middle" fill="#9a4a00" font-size="12">t3.micro</text>
+  <text x="847" y="455" text-anchor="middle" fill="#9a4a00" font-size="12">Node.js :80</text>
+  <rect x="930" y="395" width="120" height="80" rx="8" fill="#fff4e5" stroke="#ed7100" stroke-dasharray="5 3"/>
+  <text x="990" y="425" text-anchor="middle" fill="#9a4a00" font-size="12" font-style="italic">EC2 web</text>
+  <text x="990" y="443" text-anchor="middle" fill="#9a4a00" font-size="12" font-style="italic">ajoutée sous charge</text>
+
+  <text x="717" y="505" text-anchor="middle" fill="#9a4a00" font-size="12">Modèle de lancement : Ubuntu 24.04, IMDSv2, EBS gp3 chiffré, LabInstanceProfile, user_data</text>
+  <text x="717" y="523" text-anchor="middle" fill="#9a4a00" font-size="12">Instance non saine pour l'ALB → remplacée automatiquement par une nouvelle instance</text>
+
+  <!-- Subnets privés -->
+  <rect x="355" y="563" width="340" height="178" rx="6" fill="#e6f0fa" stroke="#2e73b8" stroke-width="1.5"/>
+  <text x="368" y="582" fill="#1d4f80" font-weight="600">Privé : 10.0.11.0/24 (sans route Internet)</text>
+  <rect x="370" y="592" width="310" height="138" rx="6" fill="none" stroke="#d13212" stroke-dasharray="6 3"/>
+  <text x="382" y="609" fill="#d13212" font-size="12" font-weight="600">SG db : 3306 depuis le SG web uniquement</text>
+  <rect x="400" y="620" width="250" height="98" rx="8" fill="#ffffff" stroke="#2e73b8" stroke-width="2"/>
+  <text x="525" y="645" text-anchor="middle" fill="#1d4f80" font-weight="600">Amazon RDS MySQL 8.4</text>
+  <text x="525" y="665" text-anchor="middle" fill="#1d4f80" font-size="12">db.t3.micro, mono-AZ</text>
+  <text x="525" y="683" text-anchor="middle" fill="#1d4f80" font-size="12">base STUDENTS, chiffrée</text>
+  <text x="525" y="701" text-anchor="middle" fill="#1d4f80" font-size="12">non accessible publiquement</text>
+
+  <rect x="740" y="563" width="340" height="178" rx="6" fill="#e6f0fa" stroke="#2e73b8" stroke-width="1.5"/>
+  <text x="753" y="582" fill="#1d4f80" font-weight="600">Privé : 10.0.12.0/24</text>
+  <text x="910" y="655" text-anchor="middle" fill="#1d4f80" font-size="12" font-style="italic">DB subnet group (2 zones)</text>
+  <text x="910" y="673" text-anchor="middle" fill="#1d4f80" font-size="12" font-style="italic">prêt pour Multi-AZ</text>
+
+  <!-- Flux -->
+  <path d="M170,150 L205,150 L205,205 L218,205" fill="none" stroke="#333" stroke-width="1.8" marker-end="url(#a)"/>
+  <path d="M170,450 L205,450 L205,232 L218,232" fill="none" stroke="#333" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#a)"/>
+  <path d="M320,215 L335,215 L335,293 L378,293" fill="none" stroke="#333" stroke-width="1.8" marker-end="url(#a)"/>
+  <line x1="462" y1="324" x2="462" y2="393" stroke="#333" stroke-width="1.8" marker-end="url(#a)"/>
+  <line x1="847" y1="324" x2="847" y2="393" stroke="#333" stroke-width="1.8" marker-end="url(#a)"/>
+  <line x1="462" y1="475" x2="462" y2="618" stroke="#2e73b8" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M847,475 L847,545 L600,545 L600,618" fill="none" stroke="#2e73b8" stroke-width="2" marker-end="url(#a)"/>
+  <text x="470" y="590" fill="#1d4f80" font-size="12" font-weight="600">:3306</text>
+  <path d="M1065,420 L1100,420 L1100,160 L830,160 L830,151" fill="none" stroke="#dd344c" stroke-width="1.6" marker-end="url(#a)"/>
+  <text x="935" y="175" fill="#a3172b" font-size="11">GetSecretValue</text>
+  <path d="M1030,151 L1030,190" fill="none" stroke="#e7157b" stroke-width="1.6" stroke-dasharray="3 3"/>
+  <text x="1036" y="200" fill="#9c0f53" font-size="11">métriques / scaling</text>
+
+  <!-- Légende -->
+  <line x1="210" y1="792" x2="245" y2="792" stroke="#333" stroke-width="1.8"/>
+  <text x="251" y="796" fill="#333" font-size="12">HTTP</text>
+  <line x1="300" y1="792" x2="335" y2="792" stroke="#333" stroke-width="1.8" stroke-dasharray="5 3"/>
+  <text x="341" y="796" fill="#333" font-size="12">SSH admin</text>
+  <line x1="430" y1="792" x2="465" y2="792" stroke="#2e73b8" stroke-width="2"/>
+  <text x="471" y="796" fill="#333" font-size="12">Accès base (privé)</text>
+  <line x1="600" y1="792" x2="635" y2="792" stroke="#dd344c" stroke-width="1.6"/>
+  <text x="641" y="796" fill="#333" font-size="12">Lecture du secret</text>
+  <rect x="770" y="785" width="30" height="14" rx="3" fill="#fff4e5" stroke="#ed7100" stroke-dasharray="5 3"/>
+  <text x="806" y="796" fill="#333" font-size="12">Instance ajoutée par le scaling (jusqu'à 4)</text>
+</svg>
