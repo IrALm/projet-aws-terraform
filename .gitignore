@@ -1,2 +1,16 @@
+# Terraform : dossiers de travail et fichiers d'état (contiennent IDs, IP, parfois des secrets)
 .terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Valeurs propres à chaque poste (le modèle terraform.tfvars.example reste versionné)
 *.tfvars
+!*.tfvars.example
+
+# Clés et identifiants
+*.pem
+*.key
+id_*
+.aws/
