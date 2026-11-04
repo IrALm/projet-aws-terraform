@@ -1,10 +1,45 @@
 {{>header}}
-<div class="container">
-    {{>nav}}
-    <div class="container">
+{{>nav}}
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Office of Admissions</p>
         <h1>Welcome</h1>
-        <p>Use this app to keep track of your student inquiries</p>
-        <p><a href="/students">List of students</a></p>
+        <p class="page-sub">Use this app to keep track of your student inquiries.</p>
     </div>
+    <a class="btn btn-primary" href="/supplier-add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New student
+    </a>
 </div>
+
+<div class="tiles">
+    <a class="card tile" href="/students">
+        <span class="tile-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </span>
+        <span class="tile-title">List of students</span>
+        <span class="tile-text">Browse, search and update the student records.</span>
+    </a>
+    <a class="card tile" href="/supplier-add">
+        <span class="tile-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        </span>
+        <span class="tile-title">Register a student</span>
+        <span class="tile-text">Create a new record for an incoming inquiry.</span>
+    </a>
+</div>
+
+<section class="card" style="margin-top: 20px;">
+    <div class="card-header"><h2>About this application</h2></div>
+    <div class="card-body">
+        <dl class="definition">
+            <dt>Purpose</dt>
+            <dd>Central register of student inquiries received during the admissions period.</dd>
+            <dt>Records</dt>
+            <dd>Name, postal address, city, state, email and phone number of each student.</dd>
+            <dt>Access</dt>
+            <dd>Office of Admissions staff.</dd>
+        </dl>
+    </div>
+</section>
 {{>footer}}

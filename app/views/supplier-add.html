@@ -1,17 +1,29 @@
 {{>header}}
-<div class="container">
-    {{>nav}}
-    <div class="mt-2">
-        {{#errors}}
-        <div class="alert alert-warning" role="alert">
-            {{msg}}
-        </div>
-        {{/errors}}
+{{>nav}}
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Student records</p>
+        <h1>New student</h1>
+        <p class="page-sub">Register a new student inquiry. All fields are required.</p>
     </div>
-    <form action="/supplier-add" method="POST">
-        {{>supplier-form-fields}}
-        <button type="submit" class="btn btn-primary">Submit</button>
-    </form>
-
 </div>
+
+{{#errors.length}}
+<div class="alerts">
+    {{#errors}}
+    <div class="alert alert-warning" role="alert">{{msg}}</div>
+    {{/errors}}
+</div>
+{{/errors.length}}
+
+<form class="card" action="/supplier-add" method="POST">
+    <div class="card-header"><h2>Student information</h2></div>
+    <div class="card-body">
+        {{>supplier-form-fields}}
+    </div>
+    <div class="card-footer">
+        <a class="btn btn-secondary" href="/students">Cancel</a>
+        <button type="submit" class="btn btn-primary">Save student</button>
+    </div>
+</form>
 {{>footer}}

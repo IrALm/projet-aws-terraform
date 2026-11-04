@@ -11,8 +11,8 @@ Tout est décrit en **Terraform**, déployé et **testé réellement** dans un l
 | **1. Application de base** | VPC, 1 instance EC2 avec l'application et MySQL | Application en ligne, opérations CRUD fonctionnelles | [phase1/](phase1/README.md) |
 | **2. Découplage** | RDS MySQL privé, Secrets Manager, migration des données, **modules Terraform** | Base inaccessible depuis Internet, aucun mot de passe dans le code | [phase2/](phase2/README.md) |
 | **3. Haute disponibilité et scalabilité** | ALB, modèle de lancement, Auto Scaling (2 à 4 instances, 2 zones), tableau de bord CloudWatch | **599 887 requêtes à 1 000 req/s, 1 erreur**, scale-out automatique 2 → 4 | [phase3/](phase3/README.md) |
-| **4. Packaging** | Dockerfile, registre Amazon ECR, instances qui exécutent l'image | Image non root, 0 vulnérabilité (scan ECR), testée en local et sur EC2 | [phase4/](phase4/README.md) |
-| **5. CI/CD** | GitHub Actions : build → qualité → push → test de charge → production | Déploiement sans interruption : **545 / 545 requêtes réussies** pendant le remplacement des instances | [phase5/](phase5/README.md) |
+| **4. Packaging** | Dockerfile, registre Amazon ECR, instances qui exécutent l'image | Image non root, 0 vulnérabilité (scan ECR) ; même test de charge avec **5 fois moins de CPU** (13 % contre 64 %) | [phase4/](phase4/README.md) |
+| **5. CI/CD** | GitHub Actions : build → qualité → push → test de charge → production | Pipeline vert en 7 min, du commit à la production ; **545 / 545 requêtes réussies** pendant le remplacement des instances | [phase5/](phase5/README.md) |
 
 Chaque README de phase contient un **guide pas à pas** (de zéro jusqu'à l'application en ligne), les **tests réalisés avec leurs résultats chiffrés**, les **choix techniques**, les **difficultés rencontrées** et les **limites**.
 
@@ -28,13 +28,15 @@ Chaque README de phase contient un **guide pas à pas** (de zéro jusqu'à l'app
 | Haute disponibilité | 2 zones, instances remplacées automatiquement (health check ELB), application toujours accessible quand une instance est arrêtée |
 | Sécurité | RDS en sous-réseaux privés ; chaîne de security groups ALB → web → base ; identifiants dans Secrets Manager lus via le rôle IAM ; IMDSv2 ; chiffrement EBS et RDS ; conteneur non root |
 | Coûts optimisés | `t3.micro` et `db.t3.micro`, pas de NAT Gateway, mono-AZ pour la base (autorisé par le sujet), cycle de vie ECR, scale-in automatique |
-| Performance | Latence médiane de 93 ms depuis la France sous 1 000 req/s (essentiellement le réseau transatlantique) |
+| Performance | Latence médiane de 93 ms depuis la France sous 1 000 req/s, dont seulement quelques millisecondes de traitement côté serveur (p95 mesuré par l'ALB) : le reste est le trajet réseau transatlantique |
+
+![Tableau de bord CloudWatch pendant le déploiement CI/CD et le test de charge (phase 4)](docs/dashboard-phase4-test-de-charge.png)
 
 ## Organisation du dépôt
 
 ```
 .
-├── app/                    # Code de l'application fourni (Node.js), non modifié
+├── app/                    # Application Node.js fournie : logique serveur non modifiée, interface refaite (vues + CSS)
 ├── modules/                # Modules Terraform réutilisés par les phases 2 à 5
 │   ├── network/            #   VPC, sous-réseaux publics et privés, routage
 │   ├── security/           #   Security groups (ALB, web, base)
@@ -60,6 +62,19 @@ terraform init && terraform apply
 ```
 
 Puis suivre le README de la phase. **Une seule des phases 2 à 5 peut être déployée à la fois** : le code de l'application impose le nom du secret `Mydbsecret`.
+
+## Interface
+
+**Initiative personnelle, hors exigences du sujet** : le sujet ne demandait aucun travail sur l'interface. Nous avons choisi de la moderniser pour présenter un POC plus crédible aux utilisateurs du service des admissions, en nous imposant de ne changer **ni la logique de l'application ni l'infrastructure**.
+
+L'interface d'origine (Bootstrap 4, page unique) a été refaite dans le style d'un **intranet de gestion universitaire** : barre latérale de navigation, tableaux denses, formulaires en cartes, **thème clair et sombre** (le thème du système est suivi par défaut, et le choix est mémorisé), affichage adapté au mobile.
+
+| Thème clair | Thème sombre |
+|---|---|
+| ![Liste des étudiants, thème clair](docs/interface/liste-clair.png) | ![Liste des étudiants, thème sombre](docs/interface/liste-sombre.png) |
+| ![Modification d'un étudiant](docs/interface/modification-clair.png) | ![Tableau de bord, thème sombre](docs/interface/accueil-sombre.png) |
+
+Seuls les **vues** (`app/views/*.html`), la **feuille de style** (`app/public/css/base.css`) et un petit script **côté navigateur** (`app/public/js/app.js` : thème, filtre du tableau, confirmation de suppression) ont changé. Les routes, les noms de champs, le contrôleur, le modèle et la configuration (`config.js`, secret) sont **identiques**. Aucune modification d'infrastructure n'est nécessaire, et `test-app.sh` passe sans changement. Bootstrap et jQuery (environ 300 Ko) ont été retirés : l'interface ne charge plus aucune bibliothèque.
 
 ## Points notables
 

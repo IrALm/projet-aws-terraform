@@ -42,7 +42,7 @@ Réseau, security groups, RDS, Secrets Manager, ALB, groupe Auto Scaling et tabl
 
 ```
 projet/
-├── app/                        # Code de l'application fourni (non modifié)
+├── app/                        # Application fournie (logique serveur non modifiée, interface refaite)
 ├── modules/
 │   ├── ecr/                    # NOUVEAU : dépôt ECR + politique de cycle de vie
 │   ├── dashboard/              # NOUVEAU : tableau de bord CloudWatch (extrait de la phase 3)
@@ -214,6 +214,38 @@ Tests réels du 04/11/2026 (poste Windows + Docker Desktop, lab AWS Academy).
 | `bash scripts/test-app.sh <URL de l'ALB>` | **6 / 6** |
 | Plantage simulé (`kill -9` du processus Node.js depuis l'hôte) | Conteneur relancé par Docker, HTTP 200 au bout de **2 s** (`RestartCount=1`) |
 | `docker restart` avec `--init` | **0,4 s**, contre environ 10 s sans `--init` (Node.js en PID 1 ignore SIGTERM) |
+
+### Test de charge : même test qu'en phase 3
+
+`bash scripts/load-test.sh` : `loadtest --rps 1000 -c 500 -k` pendant 600 s contre l'ALB, 2 instances `t3.micro`.
+
+| Mesure | Phase 3 (Node.js installé par apt) | **Phase 4 (conteneur)** |
+|---|---|---|
+| Requêtes / erreurs | 599 887 / 1 | **599 908 / 1** |
+| Débit effectif | 1 000 req/s | 1 000 req/s |
+| Latence p50 / p95 / p99 | 93 / 105 / 158 ms | 92 / 105 / 174 ms |
+| **CPU moyen sous charge** | **64 %** (scale-out 2 → 4) | **13 %** (2 instances suffisent) |
+
+À charge égale, le conteneur consomme **5 fois moins de CPU**. Deux explications probables :
+
+- l'image définit `NODE_ENV=production`, ce qui active le cache des vues d'Express : les templates ne sont plus relus ni recompilés à chaque requête ;
+- elle utilise Node.js 24 (moteur V8 récent) au lieu du Node.js 18 des dépôts Ubuntu.
+
+Conséquence : le seuil de 50 % de CPU n'est pas atteint et l'Auto Scaling n'a pas besoin d'ajouter d'instances. La même infrastructure absorbe environ 5 fois plus de trafic avant de monter en charge, ce qui réduit d'autant le coût en période de pointe.
+
+### Tableau de bord CloudWatch pendant le test
+
+![Tableau de bord CloudWatch de la phase 4 : déploiement CI/CD puis test de charge](../docs/dashboard-phase4-test-de-charge.png)
+
+Lecture du tableau de bord (heures en UTC, soit 1 h de moins que l'heure de Paris) :
+
+| Graphique | Ce qu'on observe |
+|---|---|
+| **Requêtes reçues par l'ALB** | Plateau à **60 000 requêtes/min** (1 000 req/s) de 12:05 à 12:15 : la durée exacte du test |
+| **CPU moyen du groupe** | Monte à **18 % au plus** (13 % en moyenne) pendant la charge, très loin de la cible de 50 % (ligne rouge) |
+| **Temps de réponse p95 des instances** | Quelques **millisecondes** pendant la charge : les 92 ms mesurés côté client sont donc presque entièrement dus au trajet réseau France → Virginie |
+| **Erreurs 5xx** | Un seul point (1 erreur ALB vers 12:13) sur 600 000 requêtes, ce qui correspond à l'erreur unique relevée par `loadtest` |
+| **Nombre d'instances** | Pic à **4** vers 11:55 : c'est le **déploiement par le pipeline CI/CD** (phase 5). 2 nouvelles instances sont lancées et saines **avant** le retrait des 2 anciennes, puis le groupe revient à 2. Aucun scale-out pendant le test, le CPU restant sous la cible |
 
 ## Choix techniques
 

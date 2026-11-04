@@ -24,6 +24,9 @@ on:
       - "phase4/scripts/test-app.sh"
       - "phase5/**"
       - ".github/workflows/ci-cd.yml"
+      # La documentation et les schémas ne déclenchent pas de déploiement
+      - "!**/*.md"
+      - "!**/*.svg"
   pull_request:
     branches: [main]
   workflow_dispatch:

@@ -1,13 +1,11 @@
 {{>header}}
-<div class="container">
-    {{>nav}}
-    <div class="jumbotron">
-        <h1 class="display-4">404 🗺️</h1>
-        <p class="lead">Sorry, we don't seem to have that page in stock</p>
-        <hr class="my-4">
-        <p class="lead">
-            <a class="btn btn-primary btn-lg" href="/" role="button">Return to home page</a>
-        </p>
+{{>nav}}
+<section class="card error-state">
+    <div class="card-body">
+        <p class="error-code">Error 404</p>
+        <h1>Page not found</h1>
+        <p>Sorry, we don't seem to have that page. Check the address or return to the dashboard.</p>
+        <a class="btn btn-primary" href="/" role="button">Return to home page</a>
     </div>
-</div>
+</section>
 {{>footer}}

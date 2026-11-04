@@ -1,16 +1,14 @@
 {{>header}}
-<div class="container">
-    {{>nav}}
-    <div class="jumbotron">
-        <h1 class="display-4">There was an error 🙃</h1>
-        <p class="lead">Sorry, there was a problem with your request</p>
+{{>nav}}
+<section class="card error-state">
+    <div class="card-body">
+        <p class="error-code">Application error</p>
+        <h1>There was an error</h1>
+        <p>Sorry, there was a problem with your request.</p>
         {{#message}}
         <div class="alert alert-danger" role="alert">{{.}}</div>
         {{/message}}
-        <hr class="my-4">
-        <p class="lead">
-            <a class="btn btn-primary btn-lg" href="/" role="button">Return to home page</a>
-        </p>
+        <a class="btn btn-primary" href="/" role="button">Return to home page</a>
     </div>
-</div>
+</section>
 {{>footer}}

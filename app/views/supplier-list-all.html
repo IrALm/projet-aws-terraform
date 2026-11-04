@@ -1,35 +1,56 @@
 {{>header}}
-<div class="container">
-    {{>nav}}
-    <h1>All students</h1>
-    <table class="table table-hover">
-        <thead>
-        <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Address</th>
-            <th scope="col">City</th>
-            <th scope="col">State</th>
-            <th scope="col">Email</th>
-            <th scope="col">Phone</th>
-            <th scope="col"></th>
-        </tr>
-        </thead>
-        <tbody>
-        {{#students}}
-        <tr>
-            <th scope="row">{{name}}</th>
-            <td>{{address}}</td>
-            <td>{{city}}</td>
-            <td>{{state}}</td>
-            <td>{{email}}</td>
-            <td>{{phone}}</td>
-            <td><h4><span class="badge badge-info"><a class="text-light"
-                                                      href="/supplier-update/{{id}}">edit</a></span></h4></td>
-        </tr>
-        {{/students}}
-        </tbody>
-    </table>
-    <h4><a class="badge badge-success" href="/supplier-add">Add a new student</a></h4>
-
+{{>nav}}
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Student records</p>
+        <h1>All students</h1>
+        <p class="page-sub">Student inquiries registered in the system.</p>
+    </div>
+    <a class="btn btn-primary" href="/supplier-add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add a new student
+    </a>
 </div>
+
+<section class="card">
+    <div class="card-toolbar">
+        <label class="visually-hidden" for="student-filter">Filter students</label>
+        <input id="student-filter" class="input input-search" type="search"
+               placeholder="Filter by name, city, email..." data-table-filter="students-table" autocomplete="off">
+        <span class="muted" data-row-count="students-table"></span>
+    </div>
+    <div class="table-wrap">
+        <table class="table" id="students-table">
+            <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Address</th>
+                <th scope="col">City</th>
+                <th scope="col">State</th>
+                <th scope="col">Email</th>
+                <th scope="col">Phone</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+            </thead>
+            <tbody>
+            {{#students}}
+            <tr>
+                <th scope="row">{{name}}</th>
+                <td class="cell-muted">{{address}}</td>
+                <td>{{city}}</td>
+                <td>{{state}}</td>
+                <td><a href="mailto:{{email}}">{{email}}</a></td>
+                <td class="cell-muted">{{phone}}</td>
+                <td class="cell-actions"><a class="btn btn-secondary btn-sm" href="/supplier-update/{{id}}">Edit</a></td>
+            </tr>
+            {{/students}}
+            {{^students}}
+            <tr class="empty-row">
+                <td colspan="7">No student records yet. <a href="/supplier-add">Add the first student</a>.</td>
+            </tr>
+            {{/students}}
+            </tbody>
+        </table>
+    </div>
+</section>
 {{>footer}}

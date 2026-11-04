@@ -55,7 +55,7 @@ L'environnement de **production** est l'infrastructure de la **phase 4** (ALB + 
 ```
 projet/
 ├── .github/workflows/ci-cd.yml      # Le pipeline (5 étapes)
-├── app/                             # Code de l'application (non modifié)
+├── app/                             # Application (logique serveur non modifiée, interface refaite)
 ├── phase4/                          # Dockerfile, docker-compose, test-app.sh, infrastructure de production
 └── phase5/
     ├── load-test/
@@ -151,7 +151,28 @@ Chaque étape a d'abord été exécutée à la main, depuis le poste, contre l'i
 
 ### Exécution complète sur GitHub Actions
 
-*En attente : nécessite le push du dépôt et l'ajout des 3 secrets AWS (étapes 1 à 3 du guide).*
+Exécution déclenchée par le push du commit `be5575c` sur `main` : [run 41824253671](https://github.com/IrALm/projet-aws-terraform/actions/runs/41824253671). **Succès complet au premier essai, en 7 minutes.**
+
+| Job | Résultat | Durée |
+|---|---|---|
+| 1. Build | succès | 33 s |
+| 2a. Qualité : analyse statique | succès | 70 s |
+| 2b. Qualité : tests fonctionnels | succès | 46 s |
+| 3. Packaging et push (ECR) | succès | 23 s |
+| 4. Test de charge | succès | 111 s |
+| 5. Déploiement en production | succès | 128 s |
+
+Vérifications côté AWS après l'exécution :
+
+| Vérification | Résultat |
+|---|---|
+| Image publiée | `universite-exemple-app:be5575c`, analyse ECR terminée, **0 vulnérabilité** |
+| Promotion | `be5575c` et `latest` désignent la **même empreinte** (`sha256:f5e1…`) |
+| Remplacement des instances | 2 nouvelles instances lancées à 11:55:34 (une par zone), 2 anciennes retirées à 11:57:05, après que les nouvelles ont été déclarées saines |
+| Image exécutée en production | `docker inspect` sur une nouvelle instance : `sha256:f5e1…`, l'image construite et testée par le pipeline |
+| Production après déploiement | `test-app.sh` sur l'ALB : **6 / 6** |
+
+Le déploiement est visible sur le tableau de bord CloudWatch : pic à **4 instances** vers 11:55 UTC (2 nouvelles saines avant le retrait des 2 anciennes), puis retour à 2. Voir la [capture dans le README de la phase 4](../phase4/README.md#tableau-de-bord-cloudwatch-pendant-le-test).
 
 ## Choix techniques
 
