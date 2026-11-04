@@ -3,11 +3,16 @@
 *.tfstate
 *.tfstate.*
 crash.log
+*.tfplan
+tfplan
 crash.*.log
 
 # Valeurs propres à chaque poste (le modèle terraform.tfvars.example reste versionné)
 *.tfvars
 !*.tfvars.example
+
+# Exports de base de données (contiennent des données personnelles)
+backup/
 
 # Clés et identifiants
 *.pem
